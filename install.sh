@@ -254,23 +254,35 @@ install_ollama() {
 create_global_command() {
     log_step "Creating global command"
     INSTALL_DIR="/opt/pentest-agent"
+    SCRIPT_DIR="$(pwd)"
 
     # Copy project to /opt
     if [ -d "$INSTALL_DIR" ]; then
         log_info "Updating existing installation..."
-        cp -r "$(pwd)"/* "$INSTALL_DIR/" 2>/dev/null || true
+        cp -r "$SCRIPT_DIR"/* "$INSTALL_DIR/" 2>/dev/null || true
     else
-        cp -r "$(pwd)" "$INSTALL_DIR" 2>/dev/null || mkdir -p "$INSTALL_DIR"
+        cp -r "$SCRIPT_DIR" "$INSTALL_DIR" 2>/dev/null || mkdir -p "$INSTALL_DIR"
+        cp -r "$SCRIPT_DIR"/. "$INSTALL_DIR/" 2>/dev/null || true
     fi
 
-    # Create launcher
+    # BUG4/BUG6 FIX: make results writable by all users
+    mkdir -p "$INSTALL_DIR/results"
+    chmod -R 777 "$INSTALL_DIR/results" 2>/dev/null || true
+    chmod -R 777 "$INSTALL_DIR" 2>/dev/null || true
+
+    # Create launcher that handles permissions properly
     cat > /usr/local/bin/pentest-agent << 'LAUNCHER'
 #!/bin/bash
 export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin
+# Use home dir for results if /opt not writable
+if [ ! -w /opt/pentest-agent/results ] 2>/dev/null; then
+    mkdir -p $HOME/pentest-results
+fi
 cd /opt/pentest-agent
 python3 agent.py "$@"
 LAUNCHER
     chmod +x /usr/local/bin/pentest-agent
+    log_info "Global command created. Results → ~/pentest-results/"
     log_info "Global command 'pentest-agent' created ✓"
 }
 
