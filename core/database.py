@@ -1,3 +1,4 @@
+
 """
 database.py — Full SQLite memory for pentest agent
 All scan data, findings, sessions, AI decisions stored here
