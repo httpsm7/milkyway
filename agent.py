@@ -134,21 +134,31 @@ def load_rules() -> dict:
 
 
 def setup_output_dir(target_url: str, base_dir: str = None) -> str:
-    """Create timestamped output directory"""
+    """Create timestamped output directory — BUG4 FIX: use user home if /opt not writable"""
     parsed = urlparse(target_url)
-    domain = parsed.netloc.replace(".", "_").replace(":", "_") or "target"
+    domain = parsed.netloc.replace(".", "_").replace(":", "_").replace("/","_") or "target"
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     folder_name = f"{domain}_{timestamp}"
 
+    # Priority: --output arg > ~/pentest-results > script dir/results
+    candidates = []
     if base_dir:
-        output_dir = os.path.join(base_dir, folder_name)
-    else:
-        output_dir = os.path.join(ROOT, "results", folder_name)
+        candidates.append(os.path.join(base_dir, folder_name))
+    candidates += [
+        os.path.join(os.path.expanduser("~"), "pentest-results", folder_name),
+        os.path.join(ROOT, "results", folder_name),
+        os.path.join("/tmp", "pentest-results", folder_name),
+    ]
 
-    os.makedirs(output_dir, exist_ok=True)
-    os.makedirs(os.path.join(output_dir, "poc"), exist_ok=True)
+    for output_dir in candidates:
+        try:
+            os.makedirs(output_dir, exist_ok=True)
+            os.makedirs(os.path.join(output_dir, "poc"), exist_ok=True)
+            return output_dir
+        except PermissionError:
+            continue
 
-    return output_dir
+    raise RuntimeError("Cannot create output directory. Use -o /writable/path")
 
 
 async def run_scan(target: str, args, rules: dict, log: Logger):
@@ -375,3 +385,4 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
