@@ -1,0 +1,48 @@
+# config.yaml — Global configuration
+
+agent:
+  max_iterations: 200
+  max_time_minutes: 120
+  no_finding_streak_limit: 30
+  checkpoint_every: 10
+  verify_findings: true
+  generate_poc: true
+
+ai:
+  ollama_url: "http://localhost:11434"
+  ollama_model: "llama3:8b"
+  ollama_timeout: 12
+  groq_fallback: true
+  context_max_nodes: 15
+  context_max_findings: 10
+  context_max_actions: 5
+
+network:
+  default_rate: 5
+  stealth_rate: 1
+  timeout: 10
+  max_redirects: 5
+  verify_ssl: false
+  rotate_user_agent: true
+
+tor:
+  socks_port: 9050
+  control_port: 9051
+  rotate_interval: 30
+
+scan_profiles:
+  quick:
+    max_iterations: 30
+    engines: [e01_recon, e02_discovery, e08_auth_bypass, e09_jwt_engine, e12_idor_engine]
+  standard:
+    max_iterations: 200
+    engines: all
+  deep:
+    max_iterations: 400
+    engines: all
+
+reporting:
+  include_ai_log: true
+  include_false_positives: false
+  generate_poc: true
+  format: html
