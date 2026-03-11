@@ -1,0 +1,289 @@
+# chain_patterns.yaml — 50+ known bug chain combinations
+# AI uses these to detect multi-step attack paths
+
+chains:
+  - id: C001
+    name: "IDOR → Account Takeover"
+    severity: CRITICAL
+    requires: [IDOR, PASSWORD_RESET]
+    steps:
+      - "Use IDOR to change victim email to attacker email"
+      - "Trigger password reset for victim account"
+      - "Reset link arrives at attacker email"
+      - "Full account takeover achieved"
+
+  - id: C002
+    name: "OTP Brute Force → Auth Bypass"
+    severity: CRITICAL
+    requires: [OTP_NO_RATE_LIMIT]
+    steps:
+      - "Bypass OTP rate limit via IP header rotation"
+      - "Brute force 4-digit OTP (0000-9999)"
+      - "Access account without password"
+
+  - id: C003
+    name: "IDOR → Privilege Escalation → Admin Access"
+    severity: CRITICAL
+    requires: [IDOR, MASS_ASSIGNMENT]
+    steps:
+      - "Use IDOR to enumerate admin user IDs"
+      - "Exploit mass assignment to set own role=admin"
+      - "Full admin access achieved"
+
+  - id: C004
+    name: "JWT None Algorithm → Admin Takeover"
+    severity: CRITICAL
+    requires: [JWT_NONE_ALG]
+    steps:
+      - "Decode JWT token"
+      - "Change algorithm to 'none'"
+      - "Modify role/admin claim"
+      - "Remove signature, send modified JWT"
+      - "Server accepts — admin access"
+
+  - id: C005
+    name: "SSRF → AWS Metadata → Credential Theft"
+    severity: CRITICAL
+    requires: [SSRF]
+    steps:
+      - "Use SSRF to reach 169.254.169.254"
+      - "Read /latest/meta-data/iam/security-credentials/"
+      - "Extract AWS access key + secret key"
+      - "Full AWS account compromise"
+
+  - id: C006
+    name: "Race Condition → Double Purchase"
+    severity: HIGH
+    requires: [RACE_CONDITION]
+    steps:
+      - "Send 50 simultaneous purchase requests"
+      - "Backend processes multiple before inventory/payment check"
+      - "Item purchased multiple times for price of one"
+
+  - id: C007
+    name: "Stored XSS + CSRF → Account Takeover"
+    severity: HIGH
+    requires: [XSS_STORED, CSRF]
+    steps:
+      - "Inject XSS payload in stored field (profile, comment)"
+      - "Victim visits page, XSS executes silently"
+      - "XSS sends CSRF request to change victim email"
+      - "Password reset to attacker email → takeover"
+
+  - id: C008
+    name: "Open Redirect → OAuth Token Theft"
+    severity: HIGH
+    requires: [OPEN_REDIRECT, OAUTH]
+    steps:
+      - "Find open redirect on target domain"
+      - "Craft OAuth URL: redirect_uri=target.com/redirect?url=attacker.com"
+      - "Victim authorizes app"
+      - "Token redirected to attacker via open redirect"
+
+  - id: C009
+    name: "IDOR + File Access → Mass Data Exfiltration"
+    severity: HIGH
+    requires: [IDOR, FILE_ACCESS]
+    steps:
+      - "Enumerate user IDs via IDOR"
+      - "Access file download endpoint with other user IDs"
+      - "Bulk download all users' files"
+
+  - id: C010
+    name: "SSTI → Remote Code Execution"
+    severity: CRITICAL
+    requires: [SSTI]
+    steps:
+      - "Confirm SSTI with {{7*7}} == 49"
+      - "Identify template engine (Jinja2/Twig/FreeMarker)"
+      - "Escalate to OS command execution"
+      - "Full server compromise"
+
+  - id: C011
+    name: "LFI → Log Poisoning → RCE"
+    severity: CRITICAL
+    requires: [LFI]
+    steps:
+      - "Confirm LFI with /etc/passwd read"
+      - "Identify accessible log files (/var/log/apache2/access.log)"
+      - "Poison log with PHP payload via User-Agent"
+      - "Include log file via LFI → RCE"
+
+  - id: C012
+    name: "SQL Injection → Authentication Bypass"
+    severity: CRITICAL
+    requires: [SQL_INJECTION]
+    steps:
+      - "Identify SQL injection in login endpoint"
+      - "Use ' OR 1=1-- in username field"
+      - "Bypass authentication, login as admin"
+
+  - id: C013
+    name: "Password Reset Poisoning → Account Takeover"
+    severity: CRITICAL
+    requires: [HOST_HEADER_INJECTION]
+    steps:
+      - "Inject Host header: attacker.com in password reset request"
+      - "Server generates reset link with attacker domain"
+      - "Victim receives email with poisoned link"
+      - "Victim clicks → token sent to attacker"
+
+  - id: C014
+    name: "XXE → SSRF → Internal Network Scan"
+    severity: CRITICAL
+    requires: [XXE]
+    steps:
+      - "Confirm XXE via file:///etc/passwd"
+      - "Pivot to SSRF: <!ENTITY xxe SYSTEM 'http://internal-host/'>"
+      - "Scan internal network via XXE SSRF"
+
+  - id: C015
+    name: "Subdomain Takeover → XSS → Cookie Theft"
+    severity: HIGH
+    requires: [SUBDOMAIN_TAKEOVER]
+    steps:
+      - "Take over dangling subdomain (e.g. old.target.com)"
+      - "Host malicious page on taken-over subdomain"
+      - "XSS via subdomain reads parent domain cookies"
+
+  - id: C016
+    name: "GraphQL Introspection → IDOR → Data Dump"
+    severity: HIGH
+    requires: [GRAPHQL_INTROSPECTION, IDOR]
+    steps:
+      - "Run GraphQL introspection to get full schema"
+      - "Identify user/data query types"
+      - "Enumerate all user IDs via IDOR in GraphQL queries"
+      - "Dump all user data"
+
+  - id: C017
+    name: "CORS Misconfiguration → Sensitive Data Theft"
+    severity: HIGH
+    requires: [CORS_MISCONFIG]
+    steps:
+      - "Identify CORS: reflects origin + credentials=true"
+      - "Host malicious JavaScript on attacker domain"
+      - "Victim visits attacker site"
+      - "AJAX request to target API, response readable → data theft"
+
+  - id: C018
+    name: "Business Logic → Free Purchase"
+    severity: HIGH
+    requires: [PRICE_MANIPULATION, PAYMENT_BYPASS]
+    steps:
+      - "Modify price parameter to 0 or negative"
+      - "Or skip payment step entirely"
+      - "Complete order without payment"
+
+  - id: C019
+    name: "JWT Algorithm Confusion (RS256→HS256)"
+    severity: CRITICAL
+    requires: [JWT_ALG_CONFUSION]
+    steps:
+      - "Obtain server's public key (/jwks.json or from cert)"
+      - "Sign new JWT with HS256 using public key as HMAC secret"
+      - "Modify role claim to admin"
+      - "Server verifies with public key as HS256 — accepts"
+
+  - id: C020
+    name: "Rate Limit Bypass → Credential Stuffing"
+    severity: HIGH
+    requires: [RATE_LIMIT_BYPASS, WEAK_PASSWORD_POLICY]
+    steps:
+      - "Bypass rate limit on login endpoint"
+      - "Use credential stuffing wordlist"
+      - "Brute force multiple accounts"
+
+  - id: C021
+    name: "Session Fixation → Session Hijacking"
+    severity: HIGH
+    requires: [SESSION_FIXATION]
+    steps:
+      - "Set known session ID before victim login"
+      - "Victim logs in (session ID not regenerated)"
+      - "Attacker uses same session ID to access victim account"
+
+  - id: C022
+    name: "Parameter Pollution → Authorization Bypass"
+    severity: HIGH
+    requires: [PARAM_POLLUTION, BAC]
+    steps:
+      - "Duplicate authorization parameter: ?role=user&role=admin"
+      - "Server uses last/first value — role bypass"
+      - "Access admin functionality as regular user"
+
+  - id: C023
+    name: "Mass Assignment → Role Escalation"
+    severity: CRITICAL
+    requires: [MASS_ASSIGNMENT]
+    steps:
+      - "Find user registration or update endpoint"
+      - "Add role=admin or is_admin=true to request body"
+      - "Server mass-assigns all provided fields"
+      - "Account becomes admin"
+
+  - id: C024
+    name: "Insecure Direct Object Reference → PII Leak"
+    severity: HIGH
+    requires: [IDOR]
+    steps:
+      - "Enumerate IDs on profile/user endpoint"
+      - "Access other users' PII (name, email, phone, address)"
+      - "Bulk extraction via automation"
+
+  - id: C025
+    name: "WebSocket Auth Bypass → Unauthorized Actions"
+    severity: HIGH
+    requires: [WEBSOCKET_AUTH_BYPASS]
+    steps:
+      - "Connect to WebSocket without authentication"
+      - "Send privileged action messages"
+      - "Server executes without auth check"
+
+  # Additional chains continue...
+  - id: C026
+    name: "2FA Bypass via Response Manipulation"
+    severity: CRITICAL
+    requires: [TWO_FA_BYPASS]
+    steps:
+      - "Intercept 2FA verification response"
+      - "Change response: 'success: false' → 'success: true'"
+      - "Bypass 2FA entirely"
+
+  - id: C027
+    name: "IDOR on Payments → Financial Fraud"
+    severity: CRITICAL
+    requires: [IDOR, PAYMENT_ENDPOINT]
+    steps:
+      - "Access other users' payment methods via IDOR"
+      - "Initiate payment using victim's saved card"
+      - "Financial fraud"
+
+  - id: C028
+    name: "SSRF to Redis/Memcached → RCE"
+    severity: CRITICAL
+    requires: [SSRF]
+    steps:
+      - "Use SSRF to reach internal Redis (127.0.0.1:6379)"
+      - "Send Redis commands via gopher:// protocol"
+      - "Write PHP/cron payload to server"
+      - "RCE achieved"
+
+  - id: C029
+    name: "Blind XSS → Admin Panel Access"
+    severity: CRITICAL
+    requires: [XSS_BLIND, ADMIN_PANEL]
+    steps:
+      - "Inject blind XSS payload in user input fields"
+      - "Admin views reported content in admin panel"
+      - "XSS fires in admin's browser"
+      - "Extract admin session cookie → admin access"
+
+  - id: C030
+    name: "Race Condition → Negative Balance"
+    severity: HIGH
+    requires: [RACE_CONDITION, PAYMENT_ENDPOINT]
+    steps:
+      - "Send concurrent transfer/withdrawal requests"
+      - "Withdraw same balance multiple times before DB update"
+      - "Negative balance or free money"

